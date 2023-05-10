@@ -12,7 +12,9 @@
       </div>
       <button class="btn primary" :disabled="validateName" >Создать пользователя</button>
     </form>
+    <app-loader v-if="isLoading"></app-loader>
     <app-users-list
+    v-else
     :users="users"
     @load="loadUsers"
     @remove="removeUsers"
@@ -25,16 +27,19 @@ import axios from 'axios';
 import { defineComponent, ref, computed, onMounted } from "vue";
 import AppUsersList from "./AppUsersList.vue";
 import AppAlert from "./AppAlert.vue";
+import AppLoader from "./AppLoader.vue";
 export default defineComponent({
   name: "App",
   components: {
     AppUsersList,
     AppAlert,
+    AppLoader,
   },
   setup() {
     const name = ref('');
     const users = ref([]);
     const alert = ref(null);
+    const isLoading = ref(false);
 
     const validateName = computed(()=> {
       //return !name.value.trim();
@@ -60,34 +65,49 @@ export default defineComponent({
     }
 
     async function loadUsers() {
-      try {
+
+        isLoading.value = true;
+        setTimeout( async () => {
+           try {
         const { data } = await axios('https://vue-users-base-default-rtdb.europe-west1.firebasedatabase.app/users.json');
-        users.value = Object.keys(data).map((key) => {
+          users.value = Object.keys(data).map((key) => {
           return {
             id: key,
             firstName: data[key].firstName
           }
         })
         const filteredUsers = users.value.filter(user => user.firstName !== '')
-        console.log(filteredUsers);
         if (!filteredUsers.length) {
           throw new Error('В базе данных нет пользователей')
         }
-      }
-      catch (e) {
+         isLoading.value = false;
+       } catch (e) {
         alert.value = {
           type: 'danger',
           title: 'Ошибка',
           text: e.message,
         }
+        isLoading.value = false;
       }
+      }, 1500)
     }
 
     async function removeUsers(id) {
+      try {
+      const name = users.value.find((user) => user.id === id).firstName
       await axios.delete(`https://vue-users-base-default-rtdb.europe-west1.firebasedatabase.app/users/${id}.json`)
       users.value = users.value.filter((user) => {
         return user.id !== id
       })
+      alert.value = {
+        type: 'primary',
+        title: "Успешно!",
+        text: `Пользователь ${name} был удален`
+      }
+      }
+      catch(e) {
+        console.log(e);
+      }
     }
 
     onMounted(() => {
@@ -103,6 +123,7 @@ export default defineComponent({
     removeUsers,
     users: computed(() => users.value),
     alert,
+    isLoading,
   }
   }
 })
